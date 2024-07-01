@@ -322,5 +322,34 @@ def calculate_trip_cost(start: int, end: int) -> int:
     
     return cost
 
+def filter_trip_list_for_driver(trips_list, trip_point_a, trip_point_b, direction_name, route_number, exclude_user_id):
+    """Filters leaving only point A and point B, and optionally by direction and route number"""
+    filtered_trips = [
+        trip
+        for trip in trips_list
+        if trip.get("pointa") >= trip_point_a
+           and trip.get("pointb") <= trip_point_b
+           and trip.get("direction_name") == direction_name
+           and trip.get("route_number") == route_number
+           and trip.get("user_id") != exclude_user_id
+    ]
+    return filtered_trips
 
+def filter_trip_list_for_passenger(trips_list, trip_point_a, trip_point_b, direction_name, route_number, exclude_user_id):
+    """Filters leaving only point A and point B, and optionally by direction and route number"""
+    filtered_trips = [
+        trip
+        for trip in trips_list
+        if trip.get("pointa") <= trip_point_a
+           and trip.get("pointb") >= trip_point_b
+           and trip.get("direction_name") == direction_name
+           and trip.get("route_number") == route_number
+           and trip.get("user_id") != exclude_user_id
+    ]
+    return filtered_trips
 
+def find_trip_by_driver_trip_id(trips, target_driver_trip_id, key):
+    for trip in trips:
+        if trip[f'{key}'] == target_driver_trip_id:
+            return trip
+    return None

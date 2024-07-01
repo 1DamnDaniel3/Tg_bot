@@ -1239,28 +1239,29 @@ async def createTripForUser_check(message: types.Message):
         try:
             userData = requests.post(f"{BASE_URL}/сreatingtrips",
                                      json={
-                "user_id": f'{dataAboutUser[message.from_user.id]["user_id"]}',
-                "typeofmembers": f'{dataAboutTrip[message.from_user.id]["typeOfMembers"]}',
-                "tripsdates": f'{dataAboutTrip[message.from_user.id]["tripDates"]}',
-                "tripstimes": f'{dataAboutTrip[message.from_user.id]["tripTimes"]}',
-                "direction_name": f'{dataAboutTrip[message.from_user.id]["directionName"]}',
-                "route_number": dataAboutTrip[message.from_user.id]["routeNumber"],
-                "pointa": dataAboutTrip[message.from_user.id]["pointA"],
-                "pointb": dataAboutTrip[message.from_user.id]["pointB"],
-                "number_of_passengers": 0,
-                "status": "waiting",
-                "maximum_number_of_passengers": dataAboutTrip[message.from_user.id]["tripNumberOfPassengers"]
-            }).json()
+                                         "user_id": f'{dataAboutUser[message.from_user.id]["user_id"]}',
+                                         "typeofmembers": f'{dataAboutTrip[message.from_user.id]["typeOfMembers"]}',
+                                         "tripsdates": f'{dataAboutTrip[message.from_user.id]["tripDates"]}',
+                                         "tripstimes": f'{dataAboutTrip[message.from_user.id]["tripTimes"]}',
+                                         "direction_name": f'{dataAboutTrip[message.from_user.id]["directionName"]}',
+                                         "route_number": dataAboutTrip[message.from_user.id]["routeNumber"],
+                                         "pointa": dataAboutTrip[message.from_user.id]["pointA"],
+                                         "pointb": dataAboutTrip[message.from_user.id]["pointB"],
+                                         "number_of_passengers": 0,
+                                         "status": "waiting",
+                                         "maximum_number_of_passengers": dataAboutTrip[message.from_user.id]["tripNumberOfPassengers"]
+                                     }).json()
             # Processing data from the database "AgreedTrips"
-            userDataAgreedTrips = requests.post(
-                f"{BASE_URL}/gettrips/agreedTrips/suitableTrips", json={"id": "test"}).json()
+            userDataAgreedTrips = requests.get(
+                f"{BASE_URL}/gettrips/agreedTrips/suitableTrips").json()
             userDataAgreedTrips["data"] = remove_dicts_with_id(
                 userDataAgreedTrips["data"], dataAboutUser[message.from_user.id]["user_id"], "id_driver")
+
             # Processing data from the database "Trips"
-            userDataTrips = requests.post(
-                f"{BASE_URL}/gettrips/trips/suitableTrips", json={"id": "test"}).json()
+            userDataTrips = requests.get(
+                f"{BASE_URL}/gettrips/trips/suitableTrips").json()
             userData1 = remove_dicts_with_id(
-                userDataTrips["data"], dataAboutUser[message.from_user.id]["user_id"], "id")
+                userDataTrips["data"], dataAboutUser[message.from_user.id]["user_id"], "user_id")
             dataAboutTrip[message.from_user.id]["id_trip"] = userData["id_trip"]
 
             if dataAboutTrip[message.from_user.id]["typeOfMembers"] == "driver":
@@ -1283,14 +1284,26 @@ async def createTripForUser_check(message: types.Message):
                 # Processing data from the database
                 userDataPassengers = remove_dicts_with_id(
                     userData1, "driver", "typeofmembers")
-                userDataPassengers_filter_trip_list = filter_trip_list(
-                    userDataPassengers, dataAboutTrip[message.from_user.id]["pointA"], dataAboutTrip[message.from_user.id]["pointB"])
+
+
+                userDataPassengers_filter_trip_list = filter_trip_list_for_driver(
+                    userDataPassengers,
+                    dataAboutTrip[message.from_user.id]["pointA"],
+                    dataAboutTrip[message.from_user.id]["pointB"],
+                    dataAboutTrip[message.from_user.id]["directionName"],
+                    dataAboutTrip[message.from_user.id]["routeNumber"],
+                    dataAboutUser[message.from_user.id]['user_id']
+                )
+
+
                 userData2 = create_new_dict(
                     userDataPassengers_filter_trip_list)
                 userData2[dataAboutTrip[message.from_user.id]["id_agreedTrips"]] = [
                     dataAboutTrip[message.from_user.id]["tripDates"], dataAboutTrip[message.from_user.id]["tripTimes"]]
-                suitableTripIDs = algorithmForCalculatingSuitableTripsTime(userData2, dataAboutTrip[message.from_user.id]["id_agreedTrips"], algorithmForCalculatingSuitableTripsDate(
-                    userData2, dataAboutTrip[message.from_user.id]["id_agreedTrips"]), 60)
+                suitableTripIDs = algorithmForCalculatingSuitableTripsTime(userData2, dataAboutTrip[message.from_user.id]["id_agreedTrips"],
+                                                                           algorithmForCalculatingSuitableTripsDate(
+                                                                               userData2, dataAboutTrip[message.from_user.id]["id_agreedTrips"]), 60)
+
 
                 if len(suitableTripIDs) == 0:
                     await bot.send_message(message.from_user.id, text_3.t_no_matches, reply_markup=GeneralKeyboards.single_btn_command_menu)
@@ -1303,8 +1316,14 @@ async def createTripForUser_check(message: types.Message):
                         try:
                             new_lst = [dict for dict in userDataPassengers if dict.get(
                                 "id_trip") == i][0]
+
+
                             dateRequest = requests.post(f"{BASE_URL}/settrips/agreedTrips", json={
-                                                        "id_passenger": new_lst["id"], "id_trip": i, "id_agreed_trip": dataAboutTrip[message.from_user.id]["id_agreedTrips"]}).json()
+                                "id_passenger": new_lst["user_id"],
+                                "id_trip": i,
+                                "id_agreed_trip": dataAboutTrip[message.from_user.id]["id_agreedTrips"]}).json()
+
+
                         except Exception as e:
                             log_error(e)
                             await bot.send_sticker(message.from_user.id, sticker=open("data/png/file_131068229.png", 'rb'))
@@ -1312,18 +1331,19 @@ async def createTripForUser_check(message: types.Message):
                             ts(1)
                             await bot.send_message(message.from_user.id, text_2.t_technical_maintenance, reply_markup=GeneralKeyboards.single_btn_command_menu)
 
+
+
                         else:
                             if dateRequest["action"] == "success" and dateRequest["status"] == "success":
                                 try:
                                     agreedUserData = dateRequest = requests.post(
-                                        f"{BASE_URL}/getusers", json={"id": new_lst["id"]}).json()["data"]
+                                        f"{BASE_URL}/getusers", json={"id": new_lst["user_id"]}).json()["data"]
                                 except Exception as e:
                                     log_error(e)
                                     break
-                                user = await bot.get_chat(chat_id=agreedUserData["id_tg"])
                                 try:
                                     dateRequestDriver = requests.post(f"{BASE_URL}/gettrips/drivers", json={
-                                                                      "user_id": dataAboutUser[message.from_user.id]["user_id"]}).json()["data"][0]
+                                        "user_id": dataAboutUser[message.from_user.id]["user_id"]}).json()["data"][0]
                                 except Exception as e:
                                     log_error(e)
                                     await bot.send_sticker(message.from_user.id, sticker=open("data/png/file_131068229.png", 'rb'))
@@ -1331,6 +1351,7 @@ async def createTripForUser_check(message: types.Message):
                                     ts(1)
                                     await bot.send_message(message.from_user.id, text_2.t_technical_maintenance, reply_markup=GeneralKeyboards.single_btn_command_menu)
                                 # Notification to the driver
+                                user = await bot.get_chat(chat_id=agreedUserData["id_tg"])
                                 await bot.send_sticker(message.from_user.id, sticker=open("data/png/file_131068230.png", 'rb'))
                                 await bot.send_message(message.from_user.id, text_3.t_good_1)
                                 ts(1)
@@ -1353,11 +1374,27 @@ async def createTripForUser_check(message: types.Message):
             # if user a passenger
             elif dataAboutTrip[message.from_user.id]["typeOfMembers"] == "passenger":
                 # Processing data from the database
-                userDataAgreedTrips["data"] = filter_trip_list(
-                    userDataAgreedTrips["data"], dataAboutTrip[message.from_user.id]["pointA"], dataAboutTrip[message.from_user.id]["pointB"])
-                userData2 = create_new_dict(userDataAgreedTrips["data"])
+                # userDataAgreedTrips["data"] = filter_trip_list(
+                #     userDataAgreedTrips["data"], dataAboutTrip[message.from_user.id]["pointA"], dataAboutTrip[message.from_user.id]["pointB"])
+
+
+                userDataTripsDriver = remove_dicts_with_id(userData1, "passenger", "typeofmembers")
+
+
+                userDataTripsDriver = filter_trip_list_for_passenger(
+                    userDataTripsDriver,
+                    int(dataAboutTrip[message.from_user.id]["pointA"]),
+                    int(dataAboutTrip[message.from_user.id]["pointB"]),
+                    dataAboutTrip[message.from_user.id]["directionName"],
+                    dataAboutTrip[message.from_user.id]["routeNumber"],
+                    dataAboutUser[message.from_user.id]['user_id']
+                )
+                userData2 = create_new_dict(userDataTripsDriver)
+
+
                 userData2[dataAboutTrip[message.from_user.id]["id_trip"]] = [
                     dataAboutTrip[message.from_user.id]["tripDates"], dataAboutTrip[message.from_user.id]["tripTimes"]]
+
                 suitableTripIDs = algorithmForCalculatingSuitableTripsTime(userData2, dataAboutTrip[message.from_user.id]["id_trip"], algorithmForCalculatingSuitableTripsDate(
                     userData2, dataAboutTrip[message.from_user.id]["id_trip"]), 60)
 
@@ -1367,9 +1404,15 @@ async def createTripForUser_check(message: types.Message):
                     check = 0
                     for i in suitableTripIDs:
                         try:
+
+                            dataAboutDriver = find_trip_by_driver_trip_id(userDataTrips["data"], i, "id_trip")
+                            id_agreed_trip = find_trip_by_driver_trip_id(userDataAgreedTrips["data"], i, "driver_trip_id")["agreeing_trips_id"]
+
                             dateRequest = requests.post(f"{BASE_URL}/settrips/agreedTrips", json={
-                                                        "id_passenger": dataAboutUser[message.from_user.id]["user_id"], "id_trip": dataAboutTrip[message.from_user.id]["id_trip"],
-                                                        "id_agreed_trip": i}).json()
+                                "id_passenger": dataAboutUser[message.from_user.id]["user_id"],
+                                "id_trip": dataAboutTrip[message.from_user.id]["id_trip"],
+                                "id_agreed_trip": id_agreed_trip}).json()
+
                         except Exception as e:
                             log_error(e)
                             await MenuUser.start_state.set()
@@ -1380,17 +1423,10 @@ async def createTripForUser_check(message: types.Message):
 
                         else:
                             if dateRequest["action"] == "success" and dateRequest["status"] == "success":
-                                driver_id = next(
-                                    (
-                                        trip.get("id_driver")
-                                        for trip in userDataAgreedTrips["data"]
-                                        if trip.get("id_trip") == i
-                                    ),
-                                    None,
-                                )
+
                                 try:
                                     agreedUserData = requests.post(
-                                        f"{BASE_URL}/getusers", json={"id": driver_id}).json()
+                                        f"{BASE_URL}/getusers", json={"id": dataAboutDriver["user_id"]}).json()
                                 except Exception as e:
                                     log_error(e)
                                     await bot.send_sticker(message.from_user.id, sticker=open("data/png/file_131068229.png", 'rb'))
@@ -1404,7 +1440,7 @@ async def createTripForUser_check(message: types.Message):
                                         agreedUserData = agreedUserData["data"]
                                 try:
                                     dateRequestDriver = requests.post(
-                                        f"{BASE_URL}/gettrips/drivers", json={"user_id": driver_id}).json()["data"][0]
+                                        f"{BASE_URL}/gettrips/drivers", json={"user_id": agreedUserData["id"]}).json()["data"][0]
                                 except Exception as e:
                                     log_error(e)
                                     await MenuUser.start_state.set()
@@ -1435,7 +1471,6 @@ async def createTripForUser_check(message: types.Message):
                         await bot.send_message(message.from_user.id, text_3.t_no_matches, reply_markup=GeneralKeyboards.single_btn_command_menu)
     else:
         await bot.send_message(message.from_user.id, text_1.t_time, reply_markup=GeneralKeyboards.single_btn_command_menu)
-
 
 # _ _ _ Admin _ _ _
 
